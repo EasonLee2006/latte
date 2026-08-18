@@ -1,9 +1,30 @@
+import json
 import os
 import random
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+# === stats ===
+STATS_FILE = "./data/stats.json"
+
+def load_stats():
+    # If the file exists, open it and read the data
+    try:
+        with open(STATS_FILE, "r") as f:
+            return json.load(f)
+    # If it's the bot's first time running, the file won't exist, so return an empty dictionary
+    except FileNotFoundError:
+        return {}
+
+def save_stats(data):
+    # Write the updated data back into the file
+    with open(STATS_FILE, "w") as f:
+        # indent=4 makes the file nicely formatted so you can easily read it yourself
+        json.dump(data, f, indent=4)
+
+
+# === commands ===
 # Intents dictate what events your bot is allowed to listen to
 intents = discord.Intents.default()
 intents.message_content = True  
@@ -52,32 +73,79 @@ async def leave(ctx):
     else:
         await ctx.send("I'm not in a voice channel!")
 
+@bot.command()
+async def pofang(ctx):
+    stats = load_stats()
+    user_id = str(ctx.author.id)
+    
+    # Check if they are in the database
+    if user_id in stats:
+        count = stats[user_id]["pofang_count"]
+        await ctx.send(f"{ctx.author.name}，你總共破防了{count}次，豪可憐喔～")
+    else:
+        await ctx.send(f"你還沒在我眼前破防過，要不要破防一下？")
+
 @bot.event
 async def on_message(message):
     # 1. Ignore messages sent by the bot itself to prevent infinite loops
     if message.author == bot.user:
         return
 
-    # Convert the message to lowercase so it catches "apple", "Apple", and "APPLE"
     msg_text = message.content.lower()
 
-    # --- Trigger 1: Exact match ---
+    # return if the message is a command
+    if msg_text[0] == bot.get_prefix:
+        await bot.process_commands(message)
+        return
+
+    # --- Exact match ---
     if msg_text == "hello bot":
         await message.channel.send("Hello there!")
 
-    # --- Trigger 2: Keyword match (anywhere in the sentence) ---
-    if "合影" in msg_text:
-        heying = [
+    # --- heying ---
+    heying = [
+        "合影",
+        "何影",
+        "合穎",
+        "何穎",
+        "heying",
+        "he ying"
+    ]
+    if any(word in msg_text for word in heying):
+        heying_reply = [
             "有神快拜 🛐",
             "太強了是電機電神 ⚡️",
             "羨慕合影 🥺"
         ]
 
-        chosen_heying = random.choice(heying)
-        
-        await message.channel.send(chosen_heying)
+        chosen_heying_reply = random.choice(heying_reply)
+        await message.channel.send(chosen_heying_reply)
 
-    # 2. CRUCIAL: You MUST include this line at the bottom to make the commands work
+    # --- pofang ---
+    pofang = [
+        "破防",
+        "破房",
+        "破大防",
+        "🏚️",
+        ":house_abandoned:"
+    ]
+    if any(word in msg_text for word in pofang):
+        # 1. Load the current stats
+        stats = load_stats()
+        
+        user_id = str(message.author.id)
+        
+        if user_id not in stats:
+            stats[user_id] = {"pofang_count": 0}
+        stats[user_id]["pofang_count"] += 1
+        
+        save_stats(stats)
+        
+        # React to the message to show it counted!
+        await message.add_reaction("🏚️")
+
+
+    # MUST include this line at the bottom to make the commands work
     await bot.process_commands(message)
 
 load_dotenv()

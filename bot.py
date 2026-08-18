@@ -1,10 +1,8 @@
 import os
+import random
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-
-load_dotenv()
-TOKEN = os.getenv('BOT_TOKEN')
 
 # Intents dictate what events your bot is allowed to listen to
 intents = discord.Intents.default()
@@ -54,7 +52,34 @@ async def leave(ctx):
     else:
         await ctx.send("I'm not in a voice channel!")
 
+@bot.event
+async def on_message(message):
+    # 1. Ignore messages sent by the bot itself to prevent infinite loops
+    if message.author == bot.user:
+        return
 
-# Replace 'YOUR_TOKEN_HERE' with the token you copied from the Developer Portal
+    # Convert the message to lowercase so it catches "apple", "Apple", and "APPLE"
+    msg_text = message.content.lower()
 
+    # --- Trigger 1: Exact match ---
+    if msg_text == "hello bot":
+        await message.channel.send("Hello there!")
+
+    # --- Trigger 2: Keyword match (anywhere in the sentence) ---
+    if "合影" in msg_text:
+        heying = [
+            "有神快拜 🛐",
+            "太強了是電機電神 ⚡️",
+            "羨慕合影 🥺"
+        ]
+
+        chosen_heying = random.choice(heying)
+        
+        await message.channel.send(chosen_heying)
+
+    # 2. CRUCIAL: You MUST include this line at the bottom to make the commands work
+    await bot.process_commands(message)
+
+load_dotenv()
+TOKEN = os.getenv('BOT_TOKEN')
 bot.run(TOKEN)

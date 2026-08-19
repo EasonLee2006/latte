@@ -73,13 +73,23 @@ async def leave(ctx):
     else:
         await ctx.send("I'm not in a voice channel!")
 
+def addCount(stats, user_id, category, ammount):
+    if(user_id not in stats):
+        stats[user_id] = {}
+
+    if( category not in stats[user_id] ):
+        stats[user_id][category] = 0
+
+    stats[user_id][category] += ammount
+    return stats
+
 @bot.command()
 async def pofang(ctx):
     stats = load_stats()
     user_id = str(ctx.author.id)
     
     # Check if they are in the database
-    if user_id in stats:
+    if ( user_id in stats ) and ( "pofang_count" in stats[user_id] ):
         count = stats[user_id]["pofang_count"]
         await ctx.send(f"{ctx.author.name}，你總共破防了{count}次，豪可憐喔～")
     else:
@@ -91,7 +101,7 @@ async def heying(ctx):
     user_id = str(ctx.author.id)
     
     # Check if they are in the database
-    if user_id in stats:
+    if ( user_id in stats ) and ( "heying_count" in stats[user_id] ):
         count = stats[user_id]["heying_count"]
         await ctx.send(f"{ctx.author.name}，你膜拜了{count}次何電神 🛐")
     else:
@@ -130,11 +140,8 @@ async def on_message(message):
         # save heying count
         stats = load_stats()
         user_id = str(message.author.id)
-        if user_id not in stats:
-            stats[user_id] = {"heying_count": 0}
-        stats[user_id]["heying_count"] += 1
-        
-        save_stats(stats)
+        new_stats = addCount(stats, user_id, "heying_count", 1)
+        save_stats(new_stats)
 
     # --- pofang ---
     pofang = [
@@ -150,11 +157,9 @@ async def on_message(message):
         
         user_id = str(message.author.id)
         
-        if user_id not in stats:
-            stats[user_id] = {"pofang_count": 0}
-        stats[user_id]["pofang_count"] += 1
+        new_stats = addCount(stats, user_id, "pofang_count", 1)
         
-        save_stats(stats)
+        save_stats(new_stats)
         
         # React to the message to show it counted!
         await message.add_reaction("🏚️")

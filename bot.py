@@ -85,6 +85,18 @@ async def pofang(ctx):
     else:
         await ctx.send(f"你還沒在我眼前破防過，要不要破防一下？")
 
+@bot.command()
+async def heying(ctx):
+    stats = load_stats()
+    user_id = str(ctx.author.id)
+    
+    # Check if they are in the database
+    if user_id in stats:
+        count = stats[user_id]["heying_count"]
+        await ctx.send(f"{ctx.author.name}，你膜拜了{count}次何電神 🛐")
+    else:
+        await ctx.send(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
+
 @bot.event
 async def on_message(message):
     # 1. Ignore messages sent by the bot itself to prevent infinite loops
@@ -92,11 +104,6 @@ async def on_message(message):
         return
 
     msg_text = message.content.lower()
-
-    # return if the message is a command
-    if msg_text[0] == bot.get_prefix:
-        await bot.process_commands(message)
-        return
 
     # --- Exact match ---
     if msg_text == "hello bot":
@@ -108,10 +115,9 @@ async def on_message(message):
         "何影",
         "合穎",
         "何穎",
-        "heying",
-        "he ying"
     ]
     if any(word in msg_text for word in heying):
+
         heying_reply = [
             "有神快拜 🛐",
             "太強了是電機電神 ⚡️",
@@ -120,6 +126,15 @@ async def on_message(message):
 
         chosen_heying_reply = random.choice(heying_reply)
         await message.channel.send(chosen_heying_reply)
+
+        # save heying count
+        stats = load_stats()
+        user_id = str(message.author.id)
+        if user_id not in stats:
+            stats[user_id] = {"heying_count": 0}
+        stats[user_id]["heying_count"] += 1
+        
+        save_stats(stats)
 
     # --- pofang ---
     pofang = [

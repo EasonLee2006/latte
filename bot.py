@@ -84,28 +84,47 @@ def addCount(stats, user_id, category, ammount):
     return stats
 
 @bot.command()
-async def pofang(ctx):
+async def pofang(ctx, target: discord.Member = None):
+    if target is None:
+        target = ctx.author
+
     stats = load_stats()
-    user_id = str(ctx.author.id)
+    user_id = str(target.id)
     
     # Check if they are in the database
     if ( user_id in stats ) and ( "pofang_count" in stats[user_id] ):
         count = stats[user_id]["pofang_count"]
-        await ctx.send(f"{ctx.author.name}，你總共破防了{count}次，豪可憐喔～")
+        if (target == ctx.author):
+            await ctx.send(f"你總共破防了{count}次，豪可憐喔～")
+        else:
+            await ctx.send(f"**{target.name}**總共破防了{count}次，該怎麼讓他破防更多次呢？")
     else:
-        await ctx.send(f"你還沒在我眼前破防過，要不要破防一下？")
+        if (target == ctx.author):
+            await ctx.send(f"你還沒在我眼前破防過，要不要破防一下？")
+        else:
+            await ctx.send(f"**{target.name}**還沒破防過，他的心態十分良好")
+        
 
 @bot.command()
-async def heying(ctx):
+async def heying(ctx, target: discord.Member = None):
+    if target is None:
+        target = ctx.author
+
     stats = load_stats()
-    user_id = str(ctx.author.id)
+    user_id = str(target.id)
     
     # Check if they are in the database
     if ( user_id in stats ) and ( "heying_count" in stats[user_id] ):
         count = stats[user_id]["heying_count"]
-        await ctx.send(f"{ctx.author.name}，你膜拜了{count}次何電神 🛐")
+        if (target == ctx.author):
+            await ctx.send(f"你膜拜了{count}次何電神，必有福報")
+        else: 
+            await ctx.send(f"**{target.name}**膜拜了{count}次何電神，是個忠實的信徒")
     else:
-        await ctx.send(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
+        if (target == ctx.author):
+            await ctx.send(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
+        else:
+            await ctx.send(f"**{target.name}**還沒提及我們的唯一真神，必會遭到天譴")
 
 @bot.event
 async def on_message(message):

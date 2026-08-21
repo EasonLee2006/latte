@@ -75,6 +75,7 @@ async def join(interaction: discord.Interaction, channel: discord.VoiceChannel =
         await voice_client.move_to(channel)
         await interaction.response.send_message(f"Moved to **{channel.name}**!")
 
+
 @bot.tree.command(name = "leave", description="讓黑糖拿鐵退出通話")
 async def leave(interaction: discord.Interaction):
     # Disconnect the bot if it is currently in a voice channel
@@ -84,6 +85,7 @@ async def leave(interaction: discord.Interaction):
         await interaction.response.send_message(f"Disconnected from **{voice_client.channel}**.")
     else:
         await interaction.response.send_message("I'm not in a voice channel!")
+
 
 # helper function for adding counts
 def addCount(stats, user_id, category, ammount):
@@ -117,7 +119,7 @@ async def pofang(interaction: discord.Interaction, target: discord.Member = None
             await interaction.response.send_message(f"你還沒在我眼前破防過，要不要破防一下？")
         else:
             await interaction.response.send_message(f"**{target.name}**還沒破防過，他的心態十分良好")
-        
+
 
 @bot.tree.command(name = "heying", description="查看某人膜拜了幾次合影")
 @app_commands.describe(target = "搜尋目標（留空預設為自己）")
@@ -136,6 +138,10 @@ async def heying(interaction: discord.Interaction, target: discord.Member = None
         else: 
             await interaction.response.send_message(f"**{target.name}**膜拜了{count}次何電神，是個忠實的信徒")
     else:
+        if (target.id == 910383175258222632): # 合影
+            await interaction.response.send_message(f"他是我們的唯一真神。請說：謝謝合影")
+            return
+        
         if (target == interaction.user):
             await interaction.response.send_message(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
         else:
@@ -198,10 +204,6 @@ async def on_message(message):
         
         # React to the message to show it counted!
         await message.add_reaction("🏚️")
-
-
-    # MUST include this line at the bottom to make the commands work
-    await bot.process_commands(message)
 
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')

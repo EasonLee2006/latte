@@ -3,6 +3,7 @@ import os
 import random
 import discord
 from discord.ext import commands
+from discord import app_commands
 from dotenv import load_dotenv
 
 # === stats ===
@@ -32,6 +33,16 @@ intents.message_content = True
 # '!' will be the prefix for your bot's commands (e.g., !hello)
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# sync the slash commands
+MY_GUILD = discord.Object(id=1112239972842479636)
+@bot.event
+async def setup_hook():
+    # This sends your slash commands to Discord's servers
+    bot.tree.copy_global_to(guild=MY_GUILD)
+    await bot.tree.sync(guild=MY_GUILD)
+    print("Slash commands synced!")
+
+
 @bot.event
 async def on_ready():
     print(f'Success! Logged in as {bot.user}')
@@ -41,38 +52,40 @@ async def hello(ctx):
     # ctx (context) contains info about who sent the message and where
     await ctx.send(f'Hello {ctx.author.name}!')
 
-@bot.command()
-async def join(ctx):
-    # 1. Check if the user sending the command is actually in a voice channel
-    if not ctx.author.voice:
-        await ctx.send("You need to join a voice channel first!")
+@bot.tree.command(name = "join", description="讓黑糖拿鐵加入通話")
+@app_commands.describe(channel = "語音頻道名稱（留空預設為使用者當前所在頻道）")
+async def join(interaction: discord.Interaction, channel: discord.VoiceChannel = None):
+    # handle the channel
+    if channel is not None:
+        pass
+    elif interaction.user.voice:
+        channel = interaction.user.voice.channel
+    else:
+        await interaction.response.send_message("You need to join a voice channel first, or specify the channel.")
         return
 
-    # 2. Get the channel the user is in
-    user_channel = ctx.author.voice.channel
 
     # 3. Connect to the channel (or get the existing connection)
-    voice_client = ctx.voice_client
+    voice_client = interaction.guild.voice_client
 
     if voice_client is None:
-        # The bot is not in any voice channel yet, so it connects fresh
-        await user_channel.connect()
-        await ctx.send(f"Joined **{user_channel.name}**!")
+        await channel.connect()
+        await interaction.response.send_message(f"Joined **{channel.name}**!")
     else:
-        # The bot is already in a channel, so we move it to the user's channel
-        await voice_client.move_to(user_channel)
-        await ctx.send(f"Moved to **{user_channel.name}**!")
+        await voice_client.move_to(channel)
+        await interaction.response.send_message(f"Moved to **{channel.name}**!")
 
-@bot.command()
-async def leave(ctx):
+@bot.tree.command(name = "leave", description="讓黑糖拿鐵退出通話")
+async def leave(interaction: discord.Interaction):
     # Disconnect the bot if it is currently in a voice channel
-    voice_client = ctx.voice_client
+    voice_client = interaction.guild.voice_client
     if voice_client:
         await voice_client.disconnect()
-        await ctx.send("Disconnected from the voice channel.")
+        await interaction.response.send_message(f"Disconnected from **{voice_client.channel}**.")
     else:
-        await ctx.send("I'm not in a voice channel!")
+        await interaction.response.send_message("I'm not in a voice channel!")
 
+# helper function for adding counts
 def addCount(stats, user_id, category, ammount):
     if(user_id not in stats):
         stats[user_id] = {}
@@ -83,10 +96,11 @@ def addCount(stats, user_id, category, ammount):
     stats[user_id][category] += ammount
     return stats
 
-@bot.command()
-async def pofang(ctx, target: discord.Member = None):
+@bot.tree.command(name = "pofang", description="查看某人破防了幾次")
+@app_commands.describe(target = "搜尋目標（留空預設為自己）")
+async def pofang(interaction: discord.Interaction, target: discord.Member = None):
     if target is None:
-        target = ctx.author
+        target = interaction.user
 
     stats = load_stats()
     user_id = str(target.id)
@@ -94,21 +108,22 @@ async def pofang(ctx, target: discord.Member = None):
     # Check if they are in the database
     if ( user_id in stats ) and ( "pofang_count" in stats[user_id] ):
         count = stats[user_id]["pofang_count"]
-        if (target == ctx.author):
-            await ctx.send(f"你總共破防了{count}次，豪可憐喔～")
+        if (target == interaction.user):
+            await interaction.response.send_message(f"你總共破防了{count}次，豪可憐喔～")
         else:
-            await ctx.send(f"**{target.name}**總共破防了{count}次，該怎麼讓他破防更多次呢？")
+            await interaction.response.send_message(f"**{target.name}**總共破防了{count}次，該怎麼讓他破防更多次呢？")
     else:
-        if (target == ctx.author):
-            await ctx.send(f"你還沒在我眼前破防過，要不要破防一下？")
+        if (target == interaction.user):
+            await interaction.response.send_message(f"你還沒在我眼前破防過，要不要破防一下？")
         else:
-            await ctx.send(f"**{target.name}**還沒破防過，他的心態十分良好")
+            await interaction.response.send_message(f"**{target.name}**還沒破防過，他的心態十分良好")
         
 
-@bot.command()
-async def heying(ctx, target: discord.Member = None):
+@bot.tree.command(name = "heying", description="查看某人膜拜了幾次合影")
+@app_commands.describe(target = "搜尋目標（留空預設為自己）")
+async def heying(interaction: discord.Interaction, target: discord.Member = None):
     if target is None:
-        target = ctx.author
+        target = interaction.user
 
     stats = load_stats()
     user_id = str(target.id)
@@ -116,15 +131,16 @@ async def heying(ctx, target: discord.Member = None):
     # Check if they are in the database
     if ( user_id in stats ) and ( "heying_count" in stats[user_id] ):
         count = stats[user_id]["heying_count"]
-        if (target == ctx.author):
-            await ctx.send(f"你膜拜了{count}次何電神，必有福報")
+        if (target == interaction.user):
+            await interaction.response.send_message(f"你膜拜了{count}次何電神，必有福報")
         else: 
-            await ctx.send(f"**{target.name}**膜拜了{count}次何電神，是個忠實的信徒")
+            await interaction.response.send_message(f"**{target.name}**膜拜了{count}次何電神，是個忠實的信徒")
     else:
-        if (target == ctx.author):
-            await ctx.send(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
+        if (target == interaction.user):
+            await interaction.response.send_message(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
         else:
-            await ctx.send(f"**{target.name}**還沒提及我們的唯一真神，必會遭到天譴")
+            await interaction.response.send_message(f"**{target.name}**還沒提及我們的唯一真神，必會遭到天譴")
+
 
 @bot.event
 async def on_message(message):

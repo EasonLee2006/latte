@@ -2,6 +2,7 @@ import json
 import os
 import random
 import discord
+from typing import Literal
 from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
@@ -138,7 +139,11 @@ async def heying(interaction: discord.Interaction, target: discord.Member = None
         else: 
             await interaction.response.send_message(f"**{target.name}**膜拜了{count}次何電神，是個忠實的信徒")
     else:
-        if (target.id == 910383175258222632): # 合影
+        HEYING_ID = 910383175258222632
+        if (target.id == HEYING_ID and interaction.user == HEYING_ID): # 合影
+                    await interaction.response.send_message(f"你是電，你是光，你是唯一的神話 ⚡")
+                    return
+        if (target.id == HEYING_ID and interaction.user != HEYING_ID):
             await interaction.response.send_message(f"他是我們的唯一真神。請說：謝謝合影")
             return
         
@@ -146,6 +151,52 @@ async def heying(interaction: discord.Interaction, target: discord.Member = None
             await interaction.response.send_message(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
         else:
             await interaction.response.send_message(f"**{target.name}**還沒提及我們的唯一真神，必會遭到天譴")
+
+
+@bot.tree.command(name="leaderboard", description="查看對應項目的前五名")
+# The Literal creates the dropdown menu in Discord!
+async def leaderboard(interaction: discord.Interaction, category: Literal["pofang", "heying"]):
+    stats = load_stats()
+    
+    if not stats:
+        await interaction.response.send_message("Database is empty...")
+        return
+
+    # 1. Dynamically create the key we are looking for (e.g., "apple_count" or "orange_count")
+    stat_key = f"{category}_count"
+    
+    # 2. Sort the users based on the specific category they picked
+    sorted_users = sorted(
+        stats.items(), 
+        key=lambda x: x[1].get(stat_key, 0), 
+        reverse=True
+    )
+    
+    # 3. Filter out users who have 0 of this specific fruit!
+    # (Otherwise, someone with 10 apples and 0 oranges would show up on the orange leaderboard)
+    sorted_users = [user for user in sorted_users if user[1].get(stat_key, 0) > 0]
+    
+    # 4. Check if the list is empty after filtering
+    if not sorted_users:
+        await interaction.response.send_message(f"還沒有人在**{category}**榜上")
+        return
+
+    # Get the top 5
+    top_users = sorted_users[:5]
+    
+    # Pick the right emoji for the message
+    emoji = "🏚️" if category == "pofang" else "🛐"
+    
+    message_text = f"🏆 **{category.capitalize()} Leaderboard** 🏆\n\n"
+    
+    for index, (user_id, data) in enumerate(top_users, start=1):
+        count = data.get(stat_key, 0)
+        message_text += f"**{index}.** <@{user_id}> —— {count} {emoji}\n"
+        
+    await interaction.response.send_message(
+        message_text, 
+        allowed_mentions=discord.AllowedMentions.none()
+    )
 
 
 @bot.event

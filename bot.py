@@ -140,10 +140,10 @@ async def heying(interaction: discord.Interaction, target: discord.Member = None
             await interaction.response.send_message(f"**{target.name}**膜拜了{count}次何電神，是個忠實的信徒")
     else:
         HEYING_ID = 910383175258222632
-        if (target.id == HEYING_ID and interaction.user == HEYING_ID): # 合影
+        if (target.id == HEYING_ID and interaction.user.id == HEYING_ID): # 合影
                     await interaction.response.send_message(f"你是電，你是光，你是唯一的神話 ⚡")
                     return
-        if (target.id == HEYING_ID and interaction.user != HEYING_ID):
+        if (target.id == HEYING_ID and interaction.user.id != HEYING_ID):
             await interaction.response.send_message(f"他是我們的唯一真神。請說：謝謝合影")
             return
         
@@ -174,7 +174,7 @@ async def leaderboard(interaction: discord.Interaction, category: Literal["pofan
     
     # 3. Filter out users who have 0 of this specific fruit!
     # (Otherwise, someone with 10 apples and 0 oranges would show up on the orange leaderboard)
-    sorted_users = [user for user in sorted_users if user[1].get(stat_key, 0) > 0]
+    sorted_users = [user for user in sorted_users if user[1].get(stat_key, 0) != 0]
     
     # 4. Check if the list is empty after filtering
     if not sorted_users:

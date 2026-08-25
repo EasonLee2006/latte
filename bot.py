@@ -210,6 +210,11 @@ async def on_message(message):
     # --- Exact match ---
     if msg_text == "hello bot":
         await message.channel.send("Hello there!")
+        return
+
+
+    stats = load_stats()
+    user_id = str(message.author.id)
 
     # --- heying ---
     heying = [
@@ -220,6 +225,9 @@ async def on_message(message):
     ]
     if any(word in msg_text for word in heying):
 
+        # save heying count
+        stats = addCount(stats, user_id, "heying_count", 1)
+
         heying_reply = [
             "有神快拜 🛐",
             "太強了是電機電神 ⚡️",
@@ -228,12 +236,6 @@ async def on_message(message):
 
         chosen_heying_reply = random.choice(heying_reply)
         await message.channel.send(chosen_heying_reply)
-
-        # save heying count
-        stats = load_stats()
-        user_id = str(message.author.id)
-        new_stats = addCount(stats, user_id, "heying_count", 1)
-        save_stats(new_stats)
 
     # --- pofang ---
     pofang = [
@@ -244,17 +246,12 @@ async def on_message(message):
         ":house_abandoned:"
     ]
     if any(word in msg_text for word in pofang):
-        # 1. Load the current stats
-        stats = load_stats()
-        
-        user_id = str(message.author.id)
-        
-        new_stats = addCount(stats, user_id, "pofang_count", 1)
-        
-        save_stats(new_stats)
+        stats = addCount(stats, user_id, "pofang_count", 1)
         
         # React to the message to show it counted!
         await message.add_reaction("🏚️")
+
+    save_stats(stats)
 
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')

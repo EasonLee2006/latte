@@ -2,28 +2,67 @@ import json
 import os
 import random
 import discord
+import sqlite3
 from typing import Literal
 from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
 
 # === stats ===
-STATS_FILE = "./data/stats.json"
+def init_db():
+    # This creates 'stats.db' in your folder if it doesn't exist
+    conn = sqlite3.connect("stats.db")
+    cursor = conn.cursor()
+    
+    # Create a table with 3 columns. 
+    # 'PRIMARY KEY' means every user_id is unique; no duplicates allowed!
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id TEXT PRIMARY KEY,
+            pofang_count INTEGER DEFAULT 0,
+            heying_count INTEGER DEFAULT 0
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-def load_stats():
-    # If the file exists, open it and read the data
-    try:
-        with open(STATS_FILE, "r") as f:
-            return json.load(f)
-    # If it's the bot's first time running, the file won't exist, so return an empty dictionary
-    except FileNotFoundError:
-        return {}
+def migrate_json_to_db():
+    # 1. Check if the old JSON file still exists
+    JSON_DATA = "data/stats.json"
+    if not os.path.exists(JSON_DATA):
+        return 
 
-def save_stats(data):
-    # Write the updated data back into the file
-    with open(STATS_FILE, "w") as f:
-        # indent=4 makes the file nicely formatted so you can easily read it yourself
-        json.dump(data, f, indent=4)
+    print(f"Found {JSON_DATA}! Starting migration to SQLite...")
+    
+    # 2. Open and read the old JSON data
+    with open(JSON_DATA, "r") as f:
+        stats = json.load(f)
+
+    conn = sqlite3.connect("stats.db")
+    cursor = conn.cursor()
+
+    # 3. Loop through every user in the JSON file
+    for user_id, data in stats.items():
+        heyings = data.get("heying_count", 0)
+        pofangs = data.get("pofang_count", 0)
+        
+        # INSERT OR REPLACE ensures that if the user is already in the database 
+        # for some reason, their stats get safely overwritten with the JSON stats
+        cursor.execute('''
+            INSERT OR REPLACE INTO users (user_id, heying_count, pofang_count) 
+            VALUES (?, ?, ?)
+        ''', (user_id, heyings, pofangs))
+
+    conn.commit()
+    conn.close()
+
+    # 4. Rename the JSON file so the bot never tries to migrate it again
+    os.rename(JSON_DATA, "data/stats_backup.json")
+    print("Migration complete! stats.json was renamed to stats_backup.json")
+
+
+init_db()
+migrate_json_to_db() 
 
 
 # === commands ===
@@ -38,9 +77,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 MY_GUILD = discord.Object(id=1112239972842479636)
 @bot.event
 async def setup_hook():
-    # This sends your slash commands to Discord's servers
-    bot.tree.copy_global_to(guild=MY_GUILD)
-    await bot.tree.sync(guild=MY_GUILD)
+    await bot.tree.sync()
     print("Slash commands synced!")
 
 
@@ -88,33 +125,27 @@ async def leave(interaction: discord.Interaction):
         await interaction.response.send_message("I'm not in a voice channel!")
 
 
-# helper function for adding counts
-def addCount(stats, user_id, category, ammount):
-    if(user_id not in stats):
-        stats[user_id] = {}
-
-    if( category not in stats[user_id] ):
-        stats[user_id][category] = 0
-
-    stats[user_id][category] += ammount
-    return stats
-
 @bot.tree.command(name = "pofang", description="查看某人破防了幾次")
 @app_commands.describe(target = "搜尋目標（留空預設為自己）")
 async def pofang(interaction: discord.Interaction, target: discord.Member = None):
     if target is None:
         target = interaction.user
 
-    stats = load_stats()
     user_id = str(target.id)
+
+    conn = sqlite3.connect("stats.db")
+    cursor = conn.cursor()
+    # Fetch just the apple_count for this specific user
+    cursor.execute("SELECT pofang_count FROM users WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
     
     # Check if they are in the database
-    if ( user_id in stats ) and ( "pofang_count" in stats[user_id] ):
-        count = stats[user_id]["pofang_count"]
+    if result and result[0]>0:
         if (target == interaction.user):
-            await interaction.response.send_message(f"你總共破防了{count}次，豪可憐喔～")
+            await interaction.response.send_message(f"你總共破防了{result[0]}次，豪可憐喔～")
         else:
-            await interaction.response.send_message(f"**{target.name}**總共破防了{count}次，該怎麼讓他破防更多次呢？")
+            await interaction.response.send_message(f"**{target.name}**總共破防了{result[0]}次，該怎麼讓他破防更多次呢？")
     else:
         if (target == interaction.user):
             await interaction.response.send_message(f"你還沒在我眼前破防過，要不要破防一下？")
@@ -128,69 +159,65 @@ async def heying(interaction: discord.Interaction, target: discord.Member = None
     if target is None:
         target = interaction.user
 
-    stats = load_stats()
     user_id = str(target.id)
+
+    conn = sqlite3.connect("stats.db")
+    cursor = conn.cursor()
+    # Fetch just the apple_count for this specific user
+    cursor.execute("SELECT heying_count FROM users WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+
+    # easter egg
+    HEYING_ID = 910383175258222632
+    if (target.id == HEYING_ID and interaction.user.id == HEYING_ID): # 合影
+                await interaction.response.send_message(f"你是電，你是光，你是唯一的神話 ⚡")
+                return
+    if (target.id == HEYING_ID and interaction.user.id != HEYING_ID):
+        await interaction.response.send_message(f"他是我們的唯一真神。請說：謝謝合影")
+        return
     
     # Check if they are in the database
-    if ( user_id in stats ) and ( "heying_count" in stats[user_id] ):
-        count = stats[user_id]["heying_count"]
+    if result and result[0] > 0:
         if (target == interaction.user):
-            await interaction.response.send_message(f"你膜拜了{count}次何電神，必有福報")
-        else: 
-            await interaction.response.send_message(f"**{target.name}**膜拜了{count}次何電神，是個忠實的信徒")
-    else:
-        HEYING_ID = 910383175258222632
-        if (target.id == HEYING_ID and interaction.user.id == HEYING_ID): # 合影
-                    await interaction.response.send_message(f"你是電，你是光，你是唯一的神話 ⚡")
-                    return
-        if (target.id == HEYING_ID and interaction.user.id != HEYING_ID):
-            await interaction.response.send_message(f"他是我們的唯一真神。請說：謝謝合影")
+            await interaction.response.send_message(f"你膜拜了{result[0]}次何電神，必有福報")
             return
-        
+        else: 
+            await interaction.response.send_message(f"**{target.name}**膜拜了{result[0]}次何電神，是個忠實的信徒")
+            return
+    else:        
         if (target == interaction.user):
             await interaction.response.send_message(f"你還沒膜拜過我們的唯一真神，還不快點膜拜 😡")
+            return
         else:
             await interaction.response.send_message(f"**{target.name}**還沒提及我們的唯一真神，必會遭到天譴")
+            return
 
 
 @bot.tree.command(name="leaderboard", description="查看對應項目的前五名")
 # The Literal creates the dropdown menu in Discord!
 async def leaderboard(interaction: discord.Interaction, category: Literal["pofang", "heying"]):
-    stats = load_stats()
+    column = f"{category}_count"
     
-    if not stats:
+    conn = sqlite3.connect("stats.db")
+    cursor = conn.cursor()
+    # Ask SQLite to fetch the top 5 users directly! No Python sorting needed.
+    cursor.execute(f"SELECT user_id, {column} FROM users WHERE {column} > 0 ORDER BY {column} DESC LIMIT 5")
+    top_users = cursor.fetchall()
+    conn.close()
+    
+    if not top_users:
         await interaction.response.send_message("Database is empty...")
         return
-
-    # 1. Dynamically create the key we are looking for (e.g., "apple_count" or "orange_count")
-    stat_key = f"{category}_count"
-    
-    # 2. Sort the users based on the specific category they picked
-    sorted_users = sorted(
-        stats.items(), 
-        key=lambda x: x[1].get(stat_key, 0), 
-        reverse=True
-    )
-    
-    # 3. Filter out users who have 0 of this specific fruit!
-    # (Otherwise, someone with 10 apples and 0 oranges would show up on the orange leaderboard)
-    sorted_users = [user for user in sorted_users if user[1].get(stat_key, 0) != 0]
-    
-    # 4. Check if the list is empty after filtering
-    if not sorted_users:
-        await interaction.response.send_message(f"還沒有人在**{category}**榜上")
-        return
-
-    # Get the top 5
-    top_users = sorted_users[:5]
     
     # Pick the right emoji for the message
     emoji = "🏚️" if category == "pofang" else "🛐"
     
     message_text = f"🏆 **{category.capitalize()} Leaderboard** 🏆\n\n"
     
-    for index, (user_id, data) in enumerate(top_users, start=1):
-        count = data.get(stat_key, 0)
+    for index, row in enumerate(top_users, start=1):
+        user_id = row[0]
+        count = row[1]
         message_text += f"**{index}.** <@{user_id}> —— {count} {emoji}\n"
         
     await interaction.response.send_message(
@@ -198,6 +225,30 @@ async def leaderboard(interaction: discord.Interaction, category: Literal["pofan
         allowed_mentions=discord.AllowedMentions.none()
     )
 
+
+# helper function for adding counts
+def addCount(user_id: str, category: str, amount: int = 1):
+    # 1. SECURITY: Whitelist allowed categories to prevent SQL Injection
+    allowed_categories = ["pofang", "heying"] # Add future categories here!
+    
+    if category not in allowed_categories:
+        print(f"Error: Category '{category}' is not allowed in the database.")
+        return
+        
+    column_name = f"{category}_count"
+    
+    conn = sqlite3.connect("stats.db")
+    cursor = conn.cursor()
+    
+    # 2. Make sure the user exists first
+    cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
+    
+    # 3. Safely inject the column name with an f-string, but use ? for the values
+    query = f"UPDATE users SET {column_name} = {column_name} + ? WHERE user_id = ?"
+    cursor.execute(query, (amount, user_id))
+    
+    conn.commit()
+    conn.close()
 
 @bot.event
 async def on_message(message):
@@ -212,8 +263,6 @@ async def on_message(message):
         await message.channel.send("Hello there!")
         return
 
-
-    stats = load_stats()
     user_id = str(message.author.id)
 
     # --- heying ---
@@ -226,7 +275,7 @@ async def on_message(message):
     if any(word in msg_text for word in heying):
 
         # save heying count
-        stats = addCount(stats, user_id, "heying_count", 1)
+        addCount(user_id, "heying", 1)
 
         heying_reply = [
             "有神快拜 🛐",
@@ -243,15 +292,14 @@ async def on_message(message):
         "破房",
         "破大防",
         "🏚️",
-        ":house_abandoned:"
+        ":house_abandoned:",
+        "pdf"
     ]
     if any(word in msg_text for word in pofang):
-        stats = addCount(stats, user_id, "pofang_count", 1)
+        addCount(user_id, "pofang", 1)
         
         # React to the message to show it counted!
         await message.add_reaction("🏚️")
-
-    save_stats(stats)
 
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')

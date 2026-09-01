@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import time
 import discord
 import sqlite3
 from typing import Literal
@@ -23,6 +24,16 @@ def init_db():
             heying_count INTEGER DEFAULT 0
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS voice_stats (
+            user_id TEXT,
+            channel_id TEXT,
+            total_seconds INTEGER DEFAULT 0,
+            PRIMARY KEY (user_id, channel_id)
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -194,36 +205,193 @@ async def heying(interaction: discord.Interaction, target: discord.Member = None
             return
 
 
+def second_to_time_string( second ):
+    # Convert raw seconds into hours, minutes, and seconds
+    hours, remainder = divmod(second, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    # Build a nice time string (e.g., "2h 15m 30s")
+    time_str = ""
+    if hours > 0: time_str += f"{hours}小時"
+    if minutes > 0 or hours > 0: time_str += f"{minutes}分"
+    time_str += f"{seconds}秒"
+
+    return time_str.strip()
+
+# Dropdown menu for "Voice" leaderboard
+class VoiceChannelSelect(discord.ui.ChannelSelect):
+    def __init__(self):
+        super().__init__(
+            placeholder="選擇語音頻道...",
+            min_values=1,
+            max_values=1,
+            channel_types=[discord.ChannelType.voice] 
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_channel = self.values[0]
+        channel_id = str(selected_channel.id)
+        
+        conn = sqlite3.connect("stats.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT user_id, total_seconds 
+            FROM voice_stats 
+            WHERE channel_id = ? AND total_seconds > 0 
+            ORDER BY total_seconds DESC 
+            LIMIT 5
+        """, (channel_id,))
+        top_users = cursor.fetchall()
+        conn.close()
+
+        embed = discord.Embed(
+            title=f"🏆 Voice Time Leaderboard: <#{channel_id}> 🏆",
+            color=discord.Color.blue()
+        )
+        
+        if not top_users:
+            embed.description = "還沒有人上榜..."
+        else:
+            board_text = ""
+            for index, row in enumerate(top_users, start=1):
+                user_id = row[0]
+                score = row[1]
+
+                emoji = "⏱️"
+                
+                board_text += f"`{index}.` <@{user_id}>\n     {emoji} **{second_to_time_string(score)}**\n"
+
+            embed.description = board_text
+            
+        embed.set_footer(text=f"Filtered by {interaction.user.display_name}")
+        await interaction.response.edit_message(embed=embed, view=self.view)
+
+
+class VoiceLeaderboardView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(VoiceChannelSelect())
+
+    # --- NEW: Add the Global Button ---
+    # The @discord.ui.button decorator automatically adds this to the View
+    @discord.ui.button(label="🌐 Global Total", style=discord.ButtonStyle.primary)
+    async def global_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        conn = sqlite3.connect("stats.db")
+        cursor = conn.cursor()
+        
+        # We run the exact same SUM() query from the main command
+        cursor.execute("""
+            SELECT user_id, total_seconds, channel_id
+            FROM voice_stats
+            ORDER BY total_seconds DESC 
+            LIMIT 5
+        """)
+        top_users = cursor.fetchall()
+        conn.close()
+
+        embed = discord.Embed(
+            title="🏆 Voice Time Leaderboard 🏆",
+            color=discord.Color.blue()
+        )
+        
+        if not top_users:
+            embed.description = "還沒有人在榜上..."
+        else:
+            board_text = ""
+            for index, row in enumerate(top_users, start=1):
+                user_id = row[0]
+                score = row[1]
+                channel_id = row[2]
+
+                emoji = "⏱️"
+                
+                board_text += f"`{index}.` <@{user_id}> at <#{channel_id}> \n     {emoji} **{second_to_time_string(score)}**\n"
+
+            embed.description = board_text
+
+        embed.set_footer(text=f"Global view restored by {interaction.user.display_name}")
+        
+        # Edit the message back to the Global view
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
+# --- leaderboard ---
 @bot.tree.command(name="leaderboard", description="查看對應項目的前五名")
 # The Literal creates the dropdown menu in Discord!
-async def leaderboard(interaction: discord.Interaction, category: Literal["pofang", "heying"]):
-    column = f"{category}_count"
-    
+async def leaderboard(interaction: discord.Interaction, category: Literal["pofang", "heying", "voice"]):
     conn = sqlite3.connect("stats.db")
     cursor = conn.cursor()
-    # Ask SQLite to fetch the top 5 users directly! No Python sorting needed.
-    cursor.execute(f"SELECT user_id, {column} FROM users WHERE {column} > 0 ORDER BY {column} DESC LIMIT 5")
-    top_users = cursor.fetchall()
+
+    if category == "voice":
+        cursor.execute("""
+            SELECT user_id, total_seconds, channel_id
+            FROM voice_stats
+            ORDER BY total_seconds DESC 
+            LIMIT 5
+        """)
+        top_users = cursor.fetchall()
+        emoji = "⏱️"
+        embed_color = discord.Color.blue()
+        title_name = "Voice Time"
+
+    else:
+        column = f"{category}_count"
+
+        # Ask SQLite to fetch the top 5 users directly! No Python sorting needed.
+        cursor.execute(f"SELECT user_id, {column} FROM users WHERE {column} > 0 ORDER BY {column} DESC LIMIT 5")
+        top_users = cursor.fetchall()
+        emoji = "🏚️" if category == "pofang" else "🛐"
+        title_name= category.capitalize()
+        embed_color = discord.Color.orange() if category == "pofang" else discord.Color.purple()
+
     conn.close()
-    
-    if not top_users:
-        await interaction.response.send_message("Database is empty...")
-        return
+
     
     # Pick the right emoji for the message
-    emoji = "🏚️" if category == "pofang" else "🛐"
     
-    message_text = f"🏆 **{category.capitalize()} Leaderboard** 🏆\n\n"
-    
+    embed = discord.Embed(
+        title=f"🏆 {title_name} Leaderboard 🏆",
+        color=embed_color
+    )
+
+    if not top_users:
+        board_text = "還沒有人在榜上..."
+        embed.description = board_text
+        await interaction.response.send_message(
+            embed=embed, 
+            allowed_mentions=discord.AllowedMentions.none()
+        )
+        return
+
+    board_text = ""
     for index, row in enumerate(top_users, start=1):
         user_id = row[0]
-        count = row[1]
-        message_text += f"**{index}.** <@{user_id}> —— {count} {emoji}\n"
-        
-    await interaction.response.send_message(
-        message_text, 
-        allowed_mentions=discord.AllowedMentions.none()
-    )
+        score = row[1]
+
+        if category == "voice":
+            channel_id = row[2]
+
+            board_text += f"`{index}.` <@{user_id}> at <#{channel_id}> \n     {emoji} **{second_to_time_string(score)}**\n"
+        else:
+            board_text += f"`{index}.` <@{user_id}> \n     {emoji} **{score}**\n"
+
+
+    embed.description = board_text
+
+    embed.set_footer(text=f"Requested by {interaction.user.display_name}")
+
+    if category == "voice":
+        await interaction.response.send_message(
+            embed=embed, 
+            view=VoiceLeaderboardView(),
+            allowed_mentions=discord.AllowedMentions.none()
+        )
+    else:
+        await interaction.response.send_message(
+            embed=embed, 
+            allowed_mentions=discord.AllowedMentions.none()
+        )
 
 
 # helper function for adding counts
@@ -250,9 +418,53 @@ def addCount(user_id: str, category: str, amount: int = 1):
     conn.commit()
     conn.close()
 
+import time
+
+# This dictionary acts as our live stopwatch for everyone in the server
+voice_sessions = {}
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    # If the user changed channels (or joined/left)
+    if before.channel != after.channel:
+        
+        # 1. Did they LEAVE a channel? (Stop the stopwatch)
+        if before.channel is not None:
+            # Get their session data and remove it from the dictionary
+            session = voice_sessions.pop(member.id, None)
+            
+            if session and session['channel_id'] == before.channel.id:
+                # Calculate how many seconds they were in there
+                elapsed_seconds = int(time.time() - session['start_time'])
+                
+                # Save it to the database
+                conn = sqlite3.connect("stats.db")
+                cursor = conn.cursor()
+                
+                # Make sure the row exists first
+                cursor.execute(
+                    "INSERT OR IGNORE INTO voice_stats (user_id, channel_id) VALUES (?, ?)", 
+                    (str(member.id), str(before.channel.id))
+                )
+                
+                # Add the new seconds to their total
+                cursor.execute(
+                    "UPDATE voice_stats SET total_seconds = max(total_seconds, ?) WHERE user_id = ? AND channel_id = ?", 
+                    (elapsed_seconds, str(member.id), str(before.channel.id))
+                )
+                
+                conn.commit()
+                conn.close()
+
+        # 2. Did they JOIN a channel? (Start the stopwatch)
+        if after.channel is not None:
+            voice_sessions[member.id] = {
+                "channel_id": after.channel.id,
+                "start_time": time.time()
+            }
+
 @bot.event
 async def on_message(message):
-    # 1. Ignore messages sent by the bot itself to prevent infinite loops
     if message.author == bot.user:
         return
 

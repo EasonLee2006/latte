@@ -3,3 +3,5 @@
 temp.txt
 .DS_Store
 *.db
+
+__pycache__/

@@ -50,7 +50,7 @@ def init_db():
     sql_delete_query = "DELETE FROM voice_stats WHERE id = ?"
 
     # 3. Provide the value as a tuple (note the trailing comma for single values)
-    user_id_to_delete = (1538623979852406814, 1284876985822216232)
+    user_id_to_delete = (1284876985822216232, )
 
     try:
         # 4. Execute the query

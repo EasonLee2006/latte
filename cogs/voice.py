@@ -1,4 +1,5 @@
 import time
+import discord
 from discord.ext import commands
 import database
 
@@ -10,7 +11,10 @@ class VoiceCog(commands.Cog):
 
     # EVENT: Notice the 'self' parameter added to the function
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member, before, after):
+    async def on_voice_state_update(self, member: discord.Member, before, after):
+        if member.bot:
+            return
+
         if before.channel != after.channel:
             # Did they leave?
             if before.channel is not None:

@@ -12,7 +12,7 @@ class WordCountCog(commands.Cog):
     # EVENT: Notice the new decorator
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author == self.bot.user:
+        if message.author.bot:
             return
 
         msg_text = message.content.lower()
@@ -30,6 +30,7 @@ class WordCountCog(commands.Cog):
             "何影",
             "合穎",
             "何穎",
+            "heying"
         ]
         if any(word in msg_text for word in heying):
 

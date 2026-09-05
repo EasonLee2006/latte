@@ -29,6 +29,41 @@ def init_db():
         print("Added collumn six_seven_count.")
 
 
+    # --- delete data from bots --- should be removed before next update
+    sql_delete_query = "DELETE FROM users WHERE id = ?"
+
+    # 3. Provide the value as a tuple (note the trailing comma for single values)
+    user_id_to_delete = (1538623979852406814, 1284876985822216232)
+
+    try:
+        # 4. Execute the query
+        cursor.execute(sql_delete_query, user_id_to_delete)
+        
+        # 5. Commit the changes to the database
+        conn.commit()
+        print(f"Successfully deleted. Rows affected: {cursor.rowcount}")
+
+    except sqlite3.Error as error:
+        print(f"Failed to delete record: {error}")
+
+
+    sql_delete_query = "DELETE FROM voice_stats WHERE id = ?"
+
+    # 3. Provide the value as a tuple (note the trailing comma for single values)
+    user_id_to_delete = (1538623979852406814, 1284876985822216232)
+
+    try:
+        # 4. Execute the query
+        cursor.execute(sql_delete_query, user_id_to_delete)
+        
+        # 5. Commit the changes to the database
+        conn.commit()
+        print(f"Successfully deleted. Rows affected: {cursor.rowcount}")
+
+    except sqlite3.Error as error:
+        print(f"Failed to delete record: {error}")
+
+
     # table for voice stats
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS voice_stats (

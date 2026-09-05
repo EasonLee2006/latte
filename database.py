@@ -15,10 +15,21 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
             pofang_count INTEGER DEFAULT 0,
-            heying_count INTEGER DEFAULT 0
+            six_seven_count INTEGER DEFAULT 0
         )
     ''')
 
+
+    # Add column six_seven_count if it is missing
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [info[1] for info in cursor.fetchall()]
+
+    if "six_seven_count" not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN six_seven_count INTEGER DEFAULT 0")
+        print("Added collumn six_seven_count.")
+
+
+    # table for voice stats
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS voice_stats (
             user_id TEXT,
@@ -67,7 +78,8 @@ def migrate_json_to_db():
 
 
 # Whitelist allowed categories to prevent SQL Injection
-allowed_categories = ["pofang", "heying", "voice"] # Add future categories here!
+# [[[ IMPORTANT ]]] remember to also change init_db 
+allowed_categories = ["pofang", "heying", "six_seven", "voice"] # Add future categories here!
 
 # to check if the category passed in is safe
 def safety_check(category):
@@ -141,7 +153,7 @@ def update_voice_stats( member_id: str, before_channel_id: str, elapsed_seconds 
 
 def getTopUsers( category: str, number ):
     if not safety_check(category):
-            return
+        return
 
     conn = sqlite3.connect("stats.db")
     cursor = conn.cursor()
@@ -162,6 +174,17 @@ def getTopUsers( category: str, number ):
         result["emoji"] = "⏱️"
         result["embed_color"] = discord.Color.blue()
         result["title_name"] = "Voice Time"
+
+    if category == "six_seven":
+        column = f"{category}_count"
+
+        query = f"SELECT user_id, {column} FROM users WHERE {column} > 0 ORDER BY {column} DESC LIMIT {number}"
+        cursor.execute(query)
+
+        result["top_users"] = cursor.fetchall()
+        result["emoji"] = "6️⃣7️⃣"
+        result["embed_color"] = discord.Color.yellow()
+        result["title_name"] = "6️⃣7️⃣"
 
     else:
         column = f"{category}_count"

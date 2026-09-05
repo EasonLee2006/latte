@@ -125,7 +125,7 @@ class LeaderboardCog(commands.Cog):
 
     @app_commands.command(name="leaderboard", description="查看對應項目的前五名")
     # The Literal creates the dropdown menu in Discord!
-    async def leaderboard(self, interaction: discord.Interaction, category: Literal["pofang", "heying", "voice"]):
+    async def leaderboard(self, interaction: discord.Interaction, category: Literal["pofang", "heying", "six_seven", "voice"]):
     
         result = database.getTopUsers(category = category, number = 5)
         

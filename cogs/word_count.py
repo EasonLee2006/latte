@@ -11,7 +11,7 @@ class WordCountCog(commands.Cog):
 
     # EVENT: Notice the new decorator
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.author == self.bot.user:
             return
 
@@ -59,6 +59,27 @@ class WordCountCog(commands.Cog):
             
             # React to the message to show it counted!
             await message.add_reaction("🏚️")
+
+        # --- six_seven ---
+        six_seven = [
+            "67",
+            "六七",
+            ":67:",
+            "6️⃣7️⃣",
+            "6️⃣ 7️⃣",
+        ]
+        if any(word in msg_text for word in six_seven):
+            database.addCount(user_id, "six_seven", 1)
+
+            six_seven_emoji = discord.utils.get(message.guild.emojis, name='67')
+            if six_seven_emoji:
+                await message.add_reaction(six_seven_emoji)
+            else:
+                await message.add_reaction("6️⃣")
+                await message.add_reaction("7️⃣")
+
+
+
 
 
     @app_commands.command(name = "pofang", description="查看某人破防了幾次")

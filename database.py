@@ -28,33 +28,6 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN six_seven_count INTEGER DEFAULT 0")
         print("Added collumn six_seven_count.")
 
-
-    # --- delete data from bots --- should be removed before next update
-    sql_delete_query = "DELETE FROM users WHERE user_id = ?"
-
-    # 3. Provide the value as a tuple (note the trailing comma for single values)
-    user_ids_to_delete = [(1284876985822216232,), (1538623979852406814,)]
-
-    try:
-        # 4. Execute the query
-        cursor.executemany(sql_delete_query, user_ids_to_delete)
-        print(f"Successfully deleted. Rows affected: {cursor.rowcount}")
-
-    except sqlite3.Error as error:
-        print(f"Failed to delete record: {error}")
-
-
-    sql_delete_query = "DELETE FROM voice_stats WHERE user_id = ?"
-
-    try:
-        # 4. Execute the query
-        cursor.executemany(sql_delete_query, user_ids_to_delete)
-        print(f"Successfully deleted. Rows affected: {cursor.rowcount}")
-
-    except sqlite3.Error as error:
-        print(f"Failed to delete record: {error}")
-
-
     # table for voice stats
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS voice_stats (
@@ -201,7 +174,7 @@ def getTopUsers( category: str, number ):
         result["embed_color"] = discord.Color.blue()
         result["title_name"] = "Voice Time"
 
-    if category == "six_seven":
+    elif category == "six_seven":
         column = f"{category}_count"
 
         query = f"SELECT user_id, {column} FROM users WHERE {column} > 0 ORDER BY {column} DESC LIMIT {number}"

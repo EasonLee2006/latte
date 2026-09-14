@@ -1,7 +1,14 @@
+# discord bot token
 .env
-/data
+
+# temporary file
 temp.txt
+
+# mac file thingy
 .DS_Store
+
+# actual database is in the cloud
 *.db
 
+# cache
 __pycache__/

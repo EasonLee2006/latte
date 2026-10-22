@@ -22,6 +22,7 @@ async def setup_hook():
     await bot.load_extension("cogs.leaderboard")
     await bot.load_extension("cogs.voice")
     await bot.load_extension("cogs.voice_channel")
+    await bot.load_extension("cogs.say")
     # await bot.load_extension("cogs.FILENAME") # Uncomment when you make voice.py
 
     # 3. Sync slash commands
